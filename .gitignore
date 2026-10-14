@@ -1,0 +1,28 @@
+# Secretos
+backend/google_maps_key.txt
+
+# Python
+.venv/
+__pycache__/
+
+# Datos generados
+backend/baches.db
+backend/capturas/
+backend/runs/
+backend/datasets/
+*.pt
+
+# Unity (generados por el editor)
+repo_unity/[Ll]ibrary/
+repo_unity/[Tt]emp/
+repo_unity/[Ll]ogs/
+repo_unity/[Oo]bj/
+repo_unity/[Bb]uild/
+repo_unity/[Bb]uilds/
+repo_unity/[Uu]ser[Ss]ettings/
+repo_unity/*.csproj
+repo_unity/*.sln
+repo_unity/*.slnx
+
+# Proyecto Unity (repositorio aparte)
+repo_unity/
