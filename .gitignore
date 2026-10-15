@@ -11,6 +11,7 @@ backend/capturas/
 backend/runs/
 backend/datasets/
 *.pt
+!backend/models/baches.pt
 
 # Unity (generados por el editor)
 repo_unity/[Ll]ibrary/

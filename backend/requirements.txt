@@ -4,4 +4,4 @@ python-multipart>=0.0.9
 requests>=2.31
 numpy>=1.26
 opencv-python>=4.9
-ultralytics>=8.2
+ultralytics>=8.3
