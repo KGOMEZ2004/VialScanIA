@@ -584,7 +584,7 @@ class VistaAnalisis {
     if (this._cargandoVivo) return;
     this._cargandoVivo = true;
     try {
-      const r = await fetch(`/api/vivo/${this.id}.jpg?t=${Date.now()}`);
+      const r = await fetch(`/api/vivo/${this.id}.jpg?t=${Date.now()}`, { headers: { Authorization: `Bearer ${Sesion.token}` } });
       if (!r.ok) return;
       const url = URL.createObjectURL(await r.blob());
       if (this.urlVivo) URL.revokeObjectURL(this.urlVivo);
@@ -1340,12 +1340,19 @@ class VistaConfiguracion {
       ${Sesion.esAdmin ? `<div><span class="punto azul" style="margin-top:6px"></span><span><b>Código de administrador</b><br>
         Para registrar nuevas cuentas de administrador: <code id="codigoAdmin">······</code>
         <button class="btn chico fantasma" id="btnCodigo" style="margin-left:6px">Generar otro</button></span></div>` : ""}
-      <div><span class="punto azul" style="margin-top:6px"></span><span><b>Vehículos</b><br>Unity y <code>detectar_camara.py</code> envían sus detecciones a <code>http://${esc(location.host)}/api/baches</code> y <code>/api/detectar</code>.</span></div>`;
+      <div><span class="punto azul" style="margin-top:6px"></span><span><b>Vehículos</b><br>Unity y <code>detectar_camara.py</code> envían sus detecciones a <code>http://${esc(location.host)}/api/baches</code> y <code>/api/detectar</code>.
+        ${Sesion.esAdmin ? `<br>Token de dispositivo (campo <i>Token Dispositivo</i> en Unity, <code>--token</code> en los scripts): <code id="tokenDispositivo">······</code>
+        <button class="btn chico fantasma" id="btnToken" style="margin-left:6px">Generar otro</button>` : ""}</span></div>`;
     if (Sesion.esAdmin) {
       const mostrar = async regenerar => { $("#codigoAdmin").textContent = (await api(`/api/admin/codigo${regenerar ? "?regenerar=true" : ""}`)).codigo; };
       mostrar(false);
       $("#btnCodigo").onclick = async () => {
         if (await confirmar({ titulo: "¿Generar un código nuevo?", texto: "El código anterior dejará de servir para registrar administradores.", boton: "Generar" })) mostrar(true);
+      };
+      const mostrarToken = async regenerar => { $("#tokenDispositivo").textContent = (await api(`/api/admin/token-dispositivo${regenerar ? "?regenerar=true" : ""}`)).token; };
+      mostrarToken(false);
+      $("#btnToken").onclick = async () => {
+        if (await confirmar({ titulo: "¿Generar un token nuevo?", texto: "Unity y las cámaras dejarán de poder enviar datos hasta que les pongas el token nuevo.", boton: "Generar" })) mostrarToken(true);
       };
     }
   }

@@ -1,8 +1,9 @@
 """
 Envía baches de prueba en ciudades de Ecuador para probar el mapa sin cámara ni YOLO.
-  python simular.py --cantidad 15
+  python simular.py --cantidad 15 --token <TOKEN>
 """
 import argparse
+import os
 import random
 import time
 
@@ -19,6 +20,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cantidad", type=int, default=10)
     ap.add_argument("--servidor", default="http://127.0.0.1:8000")
+    ap.add_argument("--token", default=os.getenv("VIALSCAN_TOKEN_DISPOSITIVO", ""),
+                    help="token de dispositivo (Configuración > Sistema o consola del servidor)")
     args = ap.parse_args()
 
     for _ in range(args.cantidad):
@@ -30,7 +33,11 @@ def main():
             "severidad": random.choice(["leve", "moderado", "grave"]),
             "fuente": "simulador",
         }
-        b = requests.post(f"{args.servidor}/api/baches", json=payload, timeout=20).json()
+        r = requests.post(f"{args.servidor}/api/baches", json=payload,
+                          headers={"X-Token-Dispositivo": args.token}, timeout=20)
+        if not r.ok:
+            raise SystemExit(f"[ERROR] {r.status_code}: {r.text}")
+        b = r.json()
         print(f"#{b['id']} {b['provincia']} / {b['canton']} | IP {b['ip_publica']} | {b['severidad']}")
         time.sleep(1.1)  # respeta el límite de Nominatim
 

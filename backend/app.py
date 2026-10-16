@@ -86,6 +86,16 @@ def solo_admin(u: dict = Depends(usuario_actual)) -> dict:
     return u
 
 
+def dispositivo_autorizado(x_token_dispositivo: str | None = Header(None)) -> None:
+    """Unity y las cámaras no inician sesión: se identifican con el token de dispositivo (Configuración > Sistema)."""
+    if not x_token_dispositivo:
+        raise HTTPException(401, "Falta la cabecera X-Token-Dispositivo")
+    with db.conectar() as con:
+        valido = secrets.compare_digest(x_token_dispositivo.strip(), db.token_dispositivo(con))
+    if not valido:
+        raise HTTPException(401, "Token de dispositivo incorrecto")
+
+
 USUARIO_VALIDO = r"^[^\s]{3,80}$"   # correo institucional o nombre de usuario (sin espacios)
 
 
@@ -372,7 +382,7 @@ class ReporteVehiculo(BaseModel):
     sesion: str | None = Field(None, max_length=64, description="Identificador de la sesión (cada Play de Unity)")
 
 
-@app.post("/api/baches")
+@app.post("/api/baches", dependencies=[Depends(dispositivo_autorizado)])
 async def recibir_reporte(rep: ReporteVehiculo, request: Request):
     imagen = guardar_imagen(base64.b64decode(rep.imagen_b64)) if rep.imagen_b64 else None
     caja = [rep.bx, rep.by, rep.bw, rep.bh] if None not in (rep.bx, rep.by, rep.bw, rep.bh) else None
@@ -384,7 +394,7 @@ async def recibir_reporte(rep: ReporteVehiculo, request: Request):
     return respuesta_compatible(res)
 
 
-@app.get("/api/baches")
+@app.get("/api/baches", dependencies=[Depends(dispositivo_autorizado)])
 def listar_para_dispositivos():
     """Lista simple de daños no reparados (minimapa de Unity)."""
     with db.conectar() as con:
@@ -395,7 +405,7 @@ def listar_para_dispositivos():
                        for f in filas]}
 
 
-@app.post("/api/detectar")
+@app.post("/api/detectar", dependencies=[Depends(dispositivo_autorizado)])
 async def detectar_frame(
     request: Request,
     imagen: UploadFile = File(...),
@@ -469,7 +479,7 @@ def _guardar_posicion(rid: int, lat: float, lon: float, velocidad: float | None)
             con.execute("UPDATE recorridos SET actualizado=?, lat=?, lon=? WHERE id=?", (db.ahora(), lat, lon, rid))
 
 
-@app.post("/api/vivo")
+@app.post("/api/vivo", dependencies=[Depends(dispositivo_autorizado)])
 async def recibir_vivo(
     request: Request,
     imagen: UploadFile = File(...),
@@ -512,7 +522,7 @@ async def capturar_vivo(rid: int, u: dict = Depends(usuario_actual)):
 
 
 @app.get("/api/vivo/{rid}.jpg")
-def imagen_vivo(rid: int):
+def imagen_vivo(rid: int, u: dict = Depends(usuario_actual)):
     v = VIVO.get(rid)
     if not v:
         raise HTTPException(404, "Sin transmisión en vivo")
@@ -856,6 +866,12 @@ class NuevoUsuario(BaseModel):
 def ver_codigo_admin(regenerar: bool = False, u: dict = Depends(solo_admin)):
     with db.conectar() as con:
         return {"codigo": db.codigo_admin(con, regenerar)}
+
+
+@app.get("/api/admin/token-dispositivo")
+def ver_token_dispositivo(regenerar: bool = False, u: dict = Depends(solo_admin)):
+    with db.conectar() as con:
+        return {"token": db.token_dispositivo(con, regenerar)}
 
 
 @app.get("/api/usuarios")

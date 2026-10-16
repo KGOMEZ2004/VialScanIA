@@ -122,10 +122,12 @@ def codigo_dano(dano_id: int) -> str:
 
 # ---------------------------------------------------------------- datos de ejemplo
 USUARIOS_INICIALES = [
-    ("Administrador", "admin", "admin", "admin123"),
-    ("Ing. Carlos Ruiz", "c.ruiz@milagro.gob.ec", "admin", "vialscan2026"),
-    ("María Torres", "m.torres@milagro.gob.ec", "tecnico", "tecnico2026"),
+    ("Administrador", "admin", "admin"),
+    ("Ing. Carlos Ruiz", "c.ruiz@milagro.gob.ec", "admin"),
+    ("María Torres", "m.torres@milagro.gob.ec", "tecnico"),
 ]
+# Contraseñas fijas de versiones anteriores: si una cuenta aún las usa, el servidor avisa al arrancar
+CONTRASENAS_ANTIGUAS = ("admin123", "vialscan2026", "tecnico2026")
 TAMANOS = {"alta": (110, 80, 10), "media": (70, 50, 6), "baja": (40, 30, 3)}
 
 # (nombre, estado, antigüedad, [(variante, fracción de la ruta, velocidad), ...], estados de los daños)
@@ -201,12 +203,26 @@ def codigo_admin(con, regenerar: bool = False) -> str:
     return codigo
 
 
+def token_dispositivo(con, regenerar: bool = False) -> str:
+    """Token que envían Unity, detectar_camara.py y simular.py en la cabecera X-Token-Dispositivo."""
+    fila = con.execute("SELECT valor FROM config WHERE clave='token_dispositivo'").fetchone()
+    if fila and not regenerar:
+        return fila["valor"]
+    token = secrets.token_urlsafe(24)
+    con.execute("INSERT OR REPLACE INTO config (clave, valor) VALUES ('token_dispositivo', ?)", (token,))
+    return token
+
+
 def sembrar(con):
-    # Usuarios iniciales (se crean los que falten; no se tocan las contraseñas de los existentes)
-    for nombre, correo, rol, clave in USUARIOS_INICIALES:
+    # Usuarios iniciales (se crean los que falten; no se tocan las contraseñas de los existentes).
+    # Contraseña: VIALSCAN_CONTRASENA_INICIAL o una aleatoria que se muestra una sola vez en la consola.
+    for nombre, correo, rol in USUARIOS_INICIALES:
         if not con.execute("SELECT 1 FROM usuarios WHERE correo=?", (correo,)).fetchone():
+            clave = os.getenv("VIALSCAN_CONTRASENA_INICIAL") or secrets.token_urlsafe(9)
             crear_usuario(con, nombre, correo, rol, clave)
+            print(f"[VialScan] Cuenta creada: {correo} / {clave}  (cámbiala en Configuración > Mi cuenta)")
     codigo_admin(con)
+    token_dispositivo(con)
     if not con.execute("SELECT 1 FROM cuadrillas").fetchone():
         con.executemany("INSERT INTO cuadrillas (nombre) VALUES (?)",
                         [("Cuadrilla Norte",), ("Cuadrilla Centro",), ("Cuadrilla Sur",)])
@@ -280,6 +296,10 @@ def iniciar():
             con.execute("INSERT INTO config (clave, valor) VALUES ('grietas_demo_manuales', '1')")
         con.execute("DELETE FROM sesiones WHERE expira < ?", (ahora(),))
         print(f"[VialScan] Código para registrar administradores: {codigo_admin(con)}  (también en Configuración > Sistema)")
+        print(f"[VialScan] Token de dispositivos (Unity / cámara): {token_dispositivo(con)}")
+        for u in con.execute("SELECT correo, sal, hash FROM usuarios").fetchall():
+            if any(verificar_contrasena(c, u["sal"], u["hash"]) for c in CONTRASENAS_ANTIGUAS):
+                print(f"[AVISO] {u['correo']} sigue con una contraseña de prueba antigua: cámbiala.")
 
 
 def fila(r) -> dict | None:

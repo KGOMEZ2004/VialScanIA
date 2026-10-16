@@ -3,12 +3,13 @@ Detección en vivo con YOLO desde webcam, video o cámara IP.
 Cada bache detectado se envía al servidor, que lo ubica en el mapa de Ecuador con la IP de la zona.
 
 Ejemplos:
-  python detectar_camara.py                              # webcam 0, ubicación por IP
+  python detectar_camara.py --token <TOKEN>              # webcam 0, ubicación por IP
   python detectar_camara.py --fuente video.mp4 --lat -0.1807 --lon -78.4678
   python detectar_camara.py --fuente rtsp://192.168.1.20:554/stream
 """
 import argparse
 import base64
+import os
 import threading
 import time
 
@@ -18,9 +19,9 @@ import requests
 from yolo_detector import DetectorBaches, dibujar
 
 
-def enviar(servidor: str, payload: dict):
+def enviar(servidor: str, token: str, payload: dict):
     try:
-        r = requests.post(f"{servidor}/api/baches", json=payload, timeout=15)
+        r = requests.post(f"{servidor}/api/baches", json=payload, headers={"X-Token-Dispositivo": token}, timeout=15)
         b = r.json()
         if r.ok:
             estado = "ya registrado, +1 reporte" if b.get("duplicado") else "NUEVO"
@@ -38,6 +39,8 @@ def main():
     ap.add_argument("--modelo", default=None, help="ruta a .pt (por defecto models/baches.pt)")
     ap.add_argument("--conf", type=float, default=0.45)
     ap.add_argument("--servidor", default="http://127.0.0.1:8000")
+    ap.add_argument("--token", default=os.getenv("VIALSCAN_TOKEN_DISPOSITIVO", ""),
+                    help="token de dispositivo (Configuración > Sistema o consola del servidor)")
     ap.add_argument("--lat", type=float, default=None, help="latitud GPS (si no, se usa la IP)")
     ap.add_argument("--lon", type=float, default=None)
     ap.add_argument("--espera", type=float, default=3.0, help="segundos mínimos entre reportes")
@@ -70,7 +73,7 @@ def main():
                 "bx": mejor["x1"] / ancho, "by": mejor["y1"] / alto,
                 "bw": (mejor["x2"] - mejor["x1"]) / ancho, "bh": (mejor["y2"] - mejor["y1"]) / alto,
             }
-            threading.Thread(target=enviar, args=(args.servidor, payload), daemon=True).start()
+            threading.Thread(target=enviar, args=(args.servidor, args.token, payload), daemon=True).start()
 
         cv2.putText(vista, f"Baches: {len(detecciones)}", (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.imshow("Detector de Baches - Ecuador", vista)

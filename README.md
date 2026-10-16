@@ -78,25 +78,31 @@ python -m uvicorn app:app --host 0.0.0.0 --port 8000
 En la consola debe verse algo como:
 
 ```
+[VialScan] Cuenta creada: admin / Xq3v9LmT2wPa  (cámbiala en Configuración > Mi cuenta)
 [VialScan] Código para registrar administradores: 123456  (también en Configuración > Sistema)
+[VialScan] Token de dispositivos (Unity / cámara): 9fK2...
 INFO:     Uvicorn running on http://0.0.0.0:8000
 ```
 
 La primera vez se crea solo `backend/baches.db` (base SQLite) con los datos de ejemplo y la carpeta `backend/capturas/`.
+**Apunta las contraseñas de las cuentas creadas**: son aleatorias y solo se muestran esa vez (ver *Cuentas iniciales*).
 **No cierres esta ventana** mientras uses el sistema (para detenerlo: `Ctrl + C`).
 
 ### Paso 5 — Entrar al panel web
 
 1. Abre **http://127.0.0.1:8000** en el navegador.
-2. Escribe correo y contraseña de una de las cuentas de prueba (tabla de abajo) y **elige el rol correcto**.
+2. Escribe correo y contraseña de una de las cuentas iniciales (las que mostró la consola) y **elige el rol correcto**.
 3. Verás la pantalla *Recorridos* con los recorridos de ejemplo de Milagro (Guayas).
 
 Con esto el programa ya funciona. Para generar daños de prueba sin Unity ni cámara, abre **otra** terminal (con el
 entorno activado, dentro de `backend`) y ejecuta:
 
 ```powershell
-python simular.py --cantidad 15
+python simular.py --cantidad 15 --token <TOKEN>
 ```
+
+`<TOKEN>` es el **token de dispositivos** que muestra la consola al arrancar (también en *Configuración › Sistema*).
+Puedes definirlo una vez con `$env:VIALSCAN_TOKEN_DISPOSITIVO = "<TOKEN>"` y omitir `--token`.
 
 ### Paso 6 — (Opcional) Simulador de Unity
 
@@ -106,12 +112,15 @@ python simular.py --cantidad 15
    Usa la versión **6000.6.3f1** (si Hub lo pide, instálala). La primera apertura tarda porque reconstruye `Library/`.
 2. Abre la escena `Assets/Scenes/SampleScene`.
 3. En el menú superior elige **Baches › Configurar escena** (crea calle, vehículo, cámara, GPS y detector).
-4. Comprueba que el servidor del **Paso 4** está corriendo.
-5. Pulsa **Play** y conduce con **W / A / S / D**.
-6. En el panel web aparece un recorrido nuevo con **● EN VIVO** (cámara + mapa GPS).
+4. Copia el **token de dispositivos** (consola del servidor o *Configuración › Sistema*) en el campo
+   **Token Dispositivo** de los componentes `CamaraDetectorYOLO` y `BachesEnMapa`.
+5. Comprueba que el servidor del **Paso 4** está corriendo.
+6. Pulsa **Play** y conduce con **W / A / S / D**.
+7. En el panel web aparece un recorrido nuevo con **● EN VIVO** (cámara + mapa GPS).
 
 Notas:
 - Si usas tu propio proyecto de Unity 6 + URP, copia `repo_unity/Assets/Baches` dentro de su `Assets/` y sigue desde el punto 3.
+- Si Unity muestra *401* o *"Token de dispositivo incorrecto"*, revisa el campo **Token Dispositivo**.
 - Si Unity corre en **otra PC**, cambia el campo `servidor` (por defecto `http://127.0.0.1:8000`) en los componentes
   `CamaraDetectorYOLO` y `BachesEnMapa` por la IP de la PC del servidor (p. ej. `http://192.168.1.20:8000`) y permite el
   puerto 8000 en el Firewall de Windows.
@@ -119,8 +128,9 @@ Notas:
 
 ### Paso 7 — (Opcional) Detección real con YOLO
 
-Sin un modelo de baches, el servidor usa `yolov8n.pt` en **modo demostración** y Unity pasa a **modo simulado**
-(el panel lo indica abajo a la izquierda). Para detectar baches reales:
+El repositorio ya incluye un modelo entrenado en **`backend/models/baches.pt`** (YOLO11n de segmentación, clases
+`pothole` y `Crack`; el servidor solo usa `pothole`). Sin ese archivo, el servidor usa `yolov8n.pt` en
+**modo demostración** y Unity pasa a **modo simulado**. Para entrenar un modelo propio:
 
 1. Descarga un dataset de baches ("pothole") de [Roboflow](https://universe.roboflow.com/) en formato **YOLOv8** y
    descomprímelo en `backend/datasets/baches/` (debe contener `data.yaml`).
@@ -150,11 +160,11 @@ Sin clave el sistema funciona (Google Maps embebido + enlaces). Para mapas grand
 Con el servidor corriendo y YOLO instalado:
 
 ```powershell
-python detectar_camara.py --lat -2.13 --lon -79.58             # webcam 0
-python detectar_camara.py --fuente video.mp4 --lat -2.13 --lon -79.58
+python detectar_camara.py --token <TOKEN> --lat -2.13 --lon -79.58             # webcam 0
+python detectar_camara.py --token <TOKEN> --fuente video.mp4 --lat -2.13 --lon -79.58
 ```
 
-Opciones: `--fuente` (índice de webcam, video o URL rtsp/http), `--modelo`, `--conf 0.45`, `--servidor`, `--espera 3`.
+Opciones: `--fuente` (índice de webcam, video o URL rtsp/http), `--modelo`, `--conf 0.45`, `--servidor`, `--espera 3`, `--token`.
 Sin `--lat/--lon` la ubicación se estima por la IP.
 
 ### Herramientas extra (solo si modificas la escena de Unity)
@@ -173,21 +183,24 @@ python herramientas/generar_mapa_unity.py        # mapa de Ecuador para Unity
 | `No module named fastapi` / `uvicorn` | Activa el entorno (`.\.venv\Scripts\Activate.ps1`) y repite el Paso 3 |
 | `address already in use` / puerto 8000 ocupado | Cierra el otro servidor o usa `--port 8001` (y cambia la URL en Unity) |
 | No puedo iniciar sesión | Revisa que el **rol** elegido coincide con la cuenta |
-| No sé el código de administrador | Aparece en la consola al arrancar y en *Configuración › Sistema* |
+| No sé el código de administrador o el token | Aparecen en la consola al arrancar y en *Configuración › Sistema* |
+| No sé la contraseña inicial | Solo se muestra al crear la base: borra `backend/baches.db` y arranca de nuevo |
+| `[AVISO] ... contraseña de prueba antigua` | Tu base es de una versión anterior con `admin123`, etc.: cámbiala en *Configuración* |
 | Provincia/cantón vacíos | Falta internet (Nominatim / ip-api) |
 | Unity: "Servidor no disponible" | Arranca el servidor (Paso 4) y revisa el campo `servidor` |
 | "MODO DEMO" / modo simulado | Normal sin `models/baches.pt`; ver Paso 7 |
 | Quiero empezar de cero | Detén el servidor y borra `backend/baches.db` y `backend/capturas/` (se recrean al arrancar) |
 
-## Cuentas de prueba
+## Cuentas iniciales
 
-**Cuentas de prueba** (cámbialas en *Configuración*):
+Al crear la base, el servidor crea estas cuentas con una **contraseña aleatoria** que muestra **una sola vez** en la
+consola (cámbiala en *Configuración › Mi cuenta*). Para fijarla tú, define `VIALSCAN_CONTRASENA_INICIAL` antes de arrancar.
 
-| Rol | Correo | Contraseña | Puede |
-|---|---|---|---|
-| Administrador | `admin` | `admin123` | Todo: validar, editar, eliminar, asignar cuadrillas, usuarios |
-| Administrador | `c.ruiz@milagro.gob.ec` | `vialscan2026` | Igual que el anterior |
-| Técnico de mantenimiento | `m.torres@milagro.gob.ec` | `tecnico2026` | Ver, marcar daños a mano, marcar reparado, reportes |
+| Rol | Correo | Puede |
+|---|---|---|
+| Administrador | `admin` | Todo: validar, editar, eliminar, asignar cuadrillas, usuarios |
+| Administrador | `c.ruiz@milagro.gob.ec` | Igual que el anterior |
+| Técnico de mantenimiento | `m.torres@milagro.gob.ec` | Ver, marcar daños a mano, marcar reparado, reportes |
 
 En el login hay que elegir el **rol** de la cuenta.
 
@@ -234,7 +247,7 @@ capó del vehículo, y daños de tres tipos (baches, grietas, hundimientos).
 - **Unity**: cada vehículo que envía detecciones abre un recorrido *En proceso*, nombrado por la calle
   (p. ej. "Diego Noboa – Barrio Batán Alto"). Tras 10 min sin detecciones pasa a *Completado*.
   Unity envía la foto, el recuadro del bache, su tamaño y la velocidad.
-- **Cámara real**: `python detectar_camara.py --lat -2.13 --lon -79.58` (necesita el modelo YOLO).
+- **Cámara real**: `python detectar_camara.py --token <TOKEN> --lat -2.13 --lon -79.58` (necesita el modelo YOLO).
 - **Fotos subidas** desde el panel: quedan *Sin procesar* hasta pulsar **Analizar con IA** (necesita YOLO).
 - Un daño a menos de 8 m de otro no reparado se cuenta como el mismo (suma "reportes").
 
@@ -248,7 +261,7 @@ pip install ultralytics opencv-python
 python entrenar.py --data datasets/baches/data.yaml --epochs 50   # dataset "pothole" de Roboflow en formato YOLOv8
 ```
 
-El modelo queda en `backend/models/baches.pt`.
+El modelo queda en `backend/models/baches.pt` (reemplaza al incluido).
 
 ## Google Maps
 
@@ -257,7 +270,7 @@ Sin API key: el detalle de cada daño muestra Google Maps embebido + enlaces. Co
 
 ## Unity (proyecto "Verificador de baches", Unity 6 + URP)
 
-Copia `repo_unity/Assets/Baches` a `Assets/`, menú **Baches → Configurar escena**, arranca el servidor y pulsa **Play**
+El proyecto está en `repo_unity/` (ver Paso 6). En otro proyecto: copia `repo_unity/Assets/Baches` a `Assets/`, menú **Baches → Configurar escena**, arranca el servidor y pulsa **Play**
 (W/A/S/D). Modos del detector (`CamaraDetectorYOLO`): *Automático* (YOLO si hay modelo; si no, simulado), *YOLO*, *Simulado*.
 
 ## Estructura
@@ -271,7 +284,8 @@ Copia `repo_unity/Assets/Baches` a `Assets/`, menú **Baches → Configurar esce
 | `backend/yolo_detector.py`, `entrenar.py`, `detectar_camara.py`, `simular.py` | IA y pruebas |
 | `web/index.html`, `web/js/*.js`, `web/css/vialscan.css` | Panel (SPA sin framework) |
 | `web/reporte.html` | Reporte imprimible / PDF |
-| `repo_unity/Assets/Baches/` | Scripts, texturas, materiales y menú de Unity |
+| `backend/tests/` | Pruebas automáticas (pytest) |
+| `repo_unity/` | Proyecto de Unity 6 (URP); lo propio está en `Assets/Baches/` |
 
 ## API principal
 
@@ -284,8 +298,21 @@ Copia `repo_unity/Assets/Baches` a `Assets/`, menú **Baches → Configurar esce
 | PUT / DELETE | `/api/danos/{id}` | Editar / eliminar (admin) |
 | POST | `/api/danos/{id}/estado` | `{accion: validar\|asignar\|reparar\|reabrir, cuadrilla}` |
 | POST / GET | `/api/recorridos/{id}/reportes` · `/api/reportes` | Guardar / listar reportes |
-| POST | `/api/baches`, `/api/detectar` | Dispositivos (Unity, cámara) — sin login |
+| GET / POST | `/api/baches` · POST `/api/detectar`, `/api/vivo` | Dispositivos (Unity, cámara): cabecera `X-Token-Dispositivo: <token>` |
+| GET | `/api/admin/token-dispositivo[?regenerar=true]` | Ver / cambiar el token de dispositivos (admin) |
 | GET | `/api/estado`, `/api/config` | Estado de YOLO · API key de Maps |
 | WS | `/ws?token=` | Eventos de daños y recorridos |
 
-> Seguridad: pensado para red local. Cambia las contraseñas de prueba y no expongas el puerto 8000 a internet sin HTTPS.
+> Seguridad: el panel exige sesión y los dispositivos, el token. Aun así está pensado para red local: no expongas el
+> puerto 8000 a internet sin HTTPS (el token y las contraseñas viajan en claro por HTTP).
+
+## Pruebas
+
+```powershell
+cd backend
+pip install -r requirements-test.txt
+python -m pytest tests -v
+```
+
+Usan una base temporal y no necesitan internet ni YOLO. GitHub Actions las ejecuta en cada *push*
+(`.github/workflows/pruebas.yml`), junto con una revisión de sintaxis de `web/js`.

@@ -25,5 +25,3 @@ repo_unity/*.csproj
 repo_unity/*.sln
 repo_unity/*.slnx
 
-# Proyecto Unity (repositorio aparte)
-repo_unity/
